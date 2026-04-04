@@ -42,7 +42,7 @@ const TYPE_CONFIG: Record<
 > = {
   mrt: { label: "MRT", color: "#757575" },
   activesg_gym: { label: "ActiveSG", imageUrl: "/unamed.png" },
-  anytime_fitness: { label: "Anytime Fitness", imageUrl: "/aflogo.PNG" },
+  anytime_fitness: { label: "Anytime Fitness", imageUrl: "/aflogo.png" },
 }
 
 function getMarkerColor(location: LocationRow) {
@@ -91,7 +91,7 @@ function createMarkerElement(location: LocationRow) {
   }
 
   if (location.type === "anytime_fitness") {
-    el.style.backgroundImage = "url('/aflogo.PNG')"
+    el.style.backgroundImage = "url('/aflogo.png')"
     el.style.backgroundSize = "contain"
     el.style.backgroundRepeat = "no-repeat"
     el.style.backgroundPosition = "center"
@@ -296,7 +296,7 @@ export default function Map() {
     }
 
     if (enabledTypes.anytime_fitness) {
-      items.push({ label: "Anytime Fitness", imageUrl: "/aflogo.PNG" })
+      items.push({ label: "Anytime Fitness", imageUrl: "/aflogo.png" })
     }
 
     return items
@@ -587,7 +587,7 @@ export default function Map() {
                 checked={enabledTypes.anytime_fitness}
                 onChange={() => toggleType("anytime_fitness")}
                 label="Anytime Fitness"
-                imageUrl="/aflogo.PNG"
+                imageUrl="/aflogo.png"
               />
             </div>
           </div>
