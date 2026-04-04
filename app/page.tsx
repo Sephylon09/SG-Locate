@@ -4,7 +4,7 @@ export default function Home() {
   return (
     <main style={{ padding: "20px" }}>
       <h1>SG Locate</h1>
-      <p>Binbin Singapore map app</p>
+      <p>Singapore map app</p>
       <Map />
     </main>
   )
