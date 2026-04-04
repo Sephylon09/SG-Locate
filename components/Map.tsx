@@ -22,6 +22,7 @@ type LocationRow = {
   line: string | null
   is_public: boolean
   user_id: string | null
+  address?: string | null
 }
 
 const LAST_UPDATED_TEXT = "Last updated 04/04/26"
@@ -37,11 +38,11 @@ const LINE_CONFIG: Record<string, { label: string; color: string }> = {
 
 const TYPE_CONFIG: Record<
   string,
-  { label: string; color?: string; useImage?: boolean }
+  { label: string; color?: string; imageUrl?: string }
 > = {
-  mrt: { label: "MRT" },
-  activesg_gym: { label: "ActiveSG", useImage: true },
-  anytime_fitness: { label: "Anytime Fitness", useImage: true },
+  mrt: { label: "MRT", color: "#757575" },
+  activesg_gym: { label: "ActiveSG", imageUrl: "/unamed.png" },
+  anytime_fitness: { label: "Anytime Fitness", imageUrl: "/AFLOGO.PNG" },
 }
 
 function getMarkerColor(location: LocationRow) {
@@ -65,8 +66,6 @@ function getMarkerColor(location: LocationRow) {
   }
 
   switch (location.type) {
-    case "activesg_gym":
-      return "#0097a7"
     case "anytime_fitness":
       return "#111827"
     default:
@@ -110,16 +109,18 @@ function createMarkerElement(location: LocationRow) {
 function LegendIcon({
   color,
   imageUrl,
+  size = 16,
 }: {
   color?: string
   imageUrl?: string
+  size?: number
 }) {
   if (imageUrl) {
     return (
       <span
         style={{
-          width: 16,
-          height: 16,
+          width: size,
+          height: size,
           backgroundImage: `url('${imageUrl}')`,
           backgroundSize: "contain",
           backgroundRepeat: "no-repeat",
@@ -134,8 +135,8 @@ function LegendIcon({
   return (
     <span
       style={{
-        width: 12,
-        height: 12,
+        width: size - 4,
+        height: size - 4,
         borderRadius: "50%",
         backgroundColor: color ?? "#757575",
         display: "inline-block",
@@ -182,11 +183,7 @@ function FilterCard({
           gap: "10px",
         }}
       >
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={onChange}
-        />
+        <input type="checkbox" checked={checked} onChange={onChange} />
         <LegendIcon color={color} imageUrl={imageUrl} />
         <span style={{ fontWeight: 600 }}>{label}</span>
       </div>
@@ -210,20 +207,21 @@ export default function Map() {
   const markersRef = useRef<mapboxgl.Marker[]>([])
 
   const [locations, setLocations] = useState<LocationRow[]>([])
+  const [showFilters, setShowFilters] = useState(false)
 
   const [enabledLines, setEnabledLines] = useState<Record<string, boolean>>({
     nsl: true,
-    ewl: true,
-    ccl: true,
-    dtl: true,
-    nel: true,
-    tel: true,
+    ewl: false,
+    ccl: false,
+    dtl: false,
+    nel: false,
+    tel: false,
   })
 
   const [enabledTypes, setEnabledTypes] = useState<Record<string, boolean>>({
     mrt: true,
     activesg_gym: true,
-    anytime_fitness: true,
+    anytime_fitness: false,
   })
 
   useEffect(() => {
@@ -255,6 +253,7 @@ export default function Map() {
         line: item.line ? String(item.line) : null,
         is_public: Boolean(item.is_public),
         user_id: item.user_id ? String(item.user_id) : null,
+        address: item.address ? String(item.address) : null,
       }))
 
       setLocations(normalized)
@@ -272,13 +271,36 @@ export default function Map() {
     return locations.filter((location) => {
       if (!enabledTypes[location.type]) return false
 
-      if (location.type === "mrt" && location.line && !enabledLines[location.line]) {
-        return false
+      if (location.type === "mrt") {
+        if (!enabledTypes.mrt) return false
+        if (location.line && !enabledLines[location.line]) return false
       }
 
       return true
     })
   }, [locations, enabledLines, enabledTypes])
+
+  const activeLegendItems = useMemo(() => {
+    const items: Array<{ label: string; color?: string; imageUrl?: string }> = []
+
+    if (enabledTypes.mrt) {
+      Object.entries(LINE_CONFIG).forEach(([key, config]) => {
+        if (enabledLines[key]) {
+          items.push({ label: config.label, color: config.color })
+        }
+      })
+    }
+
+    if (enabledTypes.activesg_gym) {
+      items.push({ label: "ActiveSG", imageUrl: "/unamed.png" })
+    }
+
+    if (enabledTypes.anytime_fitness) {
+      items.push({ label: "Anytime Fitness", imageUrl: "/AFLOGO.PNG" })
+    }
+
+    return items
+  }, [enabledLines, enabledTypes])
 
   useEffect(() => {
     const map = mapRef.current
@@ -289,6 +311,7 @@ export default function Map() {
 
     filteredLocations.forEach((location) => {
       if (Number.isNaN(location.lat) || Number.isNaN(location.lng)) return
+      if (location.lat === 0 || location.lng === 0) return
 
       const el = createMarkerElement(location)
 
@@ -317,75 +340,42 @@ export default function Map() {
     setEnabledTypes((prev) => ({ ...prev, [type]: !prev[type] }))
   }
 
+  const showOnlyNSLAndActiveSG = () => {
+    setEnabledLines({
+      nsl: true,
+      ewl: false,
+      ccl: false,
+      dtl: false,
+      nel: false,
+      tel: false,
+    })
+
+    setEnabledTypes({
+      mrt: true,
+      activesg_gym: true,
+      anytime_fitness: false,
+    })
+  }
+
+  const showAll = () => {
+    setEnabledLines({
+      nsl: true,
+      ewl: true,
+      ccl: true,
+      dtl: true,
+      nel: true,
+      tel: true,
+    })
+
+    setEnabledTypes({
+      mrt: true,
+      activesg_gym: true,
+      anytime_fitness: true,
+    })
+  }
+
   return (
-    <div style={{ display: "grid", gap: "18px" }}>
-      <div
-        style={{
-          display: "grid",
-          gap: "18px",
-          padding: "18px",
-          border: "1px solid #e5e7eb",
-          borderRadius: "16px",
-          background: "#ffffff",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-        }}
-      >
-        <div>
-          <div style={{ fontWeight: 700, marginBottom: "12px", fontSize: "15px" }}>
-            MRT Lines
-          </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-              gap: "12px",
-            }}
-          >
-            {Object.entries(LINE_CONFIG).map(([key, config]) => (
-              <FilterCard
-                key={key}
-                checked={enabledLines[key]}
-                onChange={() => toggleLine(key)}
-                label={config.label}
-                color={config.color}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <div style={{ fontWeight: 700, marginBottom: "12px", fontSize: "15px" }}>
-            Location Types
-          </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: "12px",
-            }}
-          >
-            <FilterCard
-              checked={enabledTypes.mrt}
-              onChange={() => toggleType("mrt")}
-              label="MRT"
-              color="#757575"
-            />
-            <FilterCard
-              checked={enabledTypes.activesg_gym}
-              onChange={() => toggleType("activesg_gym")}
-              label="ActiveSG"
-              imageUrl="/unamed.png"
-            />
-            <FilterCard
-              checked={enabledTypes.anytime_fitness}
-              onChange={() => toggleType("anytime_fitness")}
-              label="Anytime Fitness"
-              imageUrl="/AFLOGO.PNG"
-            />
-          </div>
-        </div>
-      </div>
-
+    <div style={{ position: "relative" }}>
       <div
         ref={mapContainer}
         style={{
@@ -395,6 +385,230 @@ export default function Map() {
           overflow: "hidden",
         }}
       />
+
+      <button
+        onClick={() => setShowFilters(true)}
+        style={{
+          position: "absolute",
+          top: 12,
+          right: 12,
+          zIndex: 20,
+          background: "#ffffff",
+          border: "1px solid #e5e7eb",
+          borderRadius: "12px",
+          padding: "10px 14px",
+          fontWeight: 600,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+          cursor: "pointer",
+        }}
+      >
+        Filter
+      </button>
+
+      {activeLegendItems.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            left: 12,
+            bottom: 12,
+            zIndex: 20,
+            maxWidth: "78%",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "8px",
+            padding: "10px",
+            background: "rgba(255,255,255,0.92)",
+            border: "1px solid #e5e7eb",
+            borderRadius: "14px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+            backdropFilter: "blur(6px)",
+          }}
+        >
+          {activeLegendItems.map((item) => (
+            <div
+              key={item.label}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "6px 10px",
+                background: "#ffffff",
+                border: "1px solid #eef2f7",
+                borderRadius: "999px",
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "#374151",
+              }}
+            >
+              <LegendIcon color={item.color} imageUrl={item.imageUrl} size={14} />
+              <span>{item.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showFilters && (
+        <div
+          onClick={() => setShowFilters(false)}
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(0,0,0,0.28)",
+            zIndex: 29,
+            borderRadius: "16px",
+          }}
+        />
+      )}
+
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          right: 0,
+          height: "100%",
+          width: "min(360px, 88vw)",
+          background: "#ffffff",
+          zIndex: 30,
+          boxShadow: "-8px 0 24px rgba(0,0,0,0.14)",
+          transform: showFilters ? "translateX(0)" : "translateX(110%)",
+          transition: "transform 0.25s ease",
+          padding: "16px",
+          display: "grid",
+          gridTemplateRows: "auto auto 1fr auto",
+          gap: "16px",
+          overflowY: "auto",
+          borderTopRightRadius: "16px",
+          borderBottomRightRadius: "16px",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <div style={{ fontSize: "18px", fontWeight: 700 }}>Filters</div>
+          <button
+            onClick={() => setShowFilters(false)}
+            style={{
+              background: "#f3f4f6",
+              border: "none",
+              borderRadius: "10px",
+              padding: "8px 10px",
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            Close
+          </button>
+        </div>
+
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          <button
+            onClick={showOnlyNSLAndActiveSG}
+            style={{
+              background: "#111827",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "10px",
+              padding: "10px 12px",
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            Default View
+          </button>
+
+          <button
+            onClick={showAll}
+            style={{
+              background: "#f3f4f6",
+              color: "#111827",
+              border: "1px solid #e5e7eb",
+              borderRadius: "10px",
+              padding: "10px 12px",
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            Show All
+          </button>
+        </div>
+
+        <div style={{ display: "grid", gap: "18px" }}>
+          <div>
+            <div style={{ fontWeight: 700, marginBottom: "12px", fontSize: "15px" }}>
+              MRT Lines
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr",
+                gap: "12px",
+              }}
+            >
+              {Object.entries(LINE_CONFIG).map(([key, config]) => (
+                <FilterCard
+                  key={key}
+                  checked={enabledLines[key]}
+                  onChange={() => toggleLine(key)}
+                  label={config.label}
+                  color={config.color}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontWeight: 700, marginBottom: "12px", fontSize: "15px" }}>
+              Location Types
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr",
+                gap: "12px",
+              }}
+            >
+              <FilterCard
+                checked={enabledTypes.mrt}
+                onChange={() => toggleType("mrt")}
+                label="MRT"
+                color="#757575"
+              />
+              <FilterCard
+                checked={enabledTypes.activesg_gym}
+                onChange={() => toggleType("activesg_gym")}
+                label="ActiveSG"
+                imageUrl="/unamed.png"
+              />
+              <FilterCard
+                checked={enabledTypes.anytime_fitness}
+                onChange={() => toggleType("anytime_fitness")}
+                label="Anytime Fitness"
+                imageUrl="/AFLOGO.PNG"
+              />
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setShowFilters(false)}
+          style={{
+            width: "100%",
+            background: "#2563eb",
+            color: "#ffffff",
+            border: "none",
+            borderRadius: "12px",
+            padding: "12px 14px",
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          Apply
+        </button>
+      </div>
     </div>
   )
 }
